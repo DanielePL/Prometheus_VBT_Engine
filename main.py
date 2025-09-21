@@ -38,5 +38,5 @@ async def process_video_endpoint(file: UploadFile = File(...)):
     headers = {
         "Content-Type": f"multipart/mixed; boundary={boundary}"
     }
-
+    print("RESULT:", json.dumps(result, indent=2, ensure_ascii=False))
     return StreamingResponse(generate(), headers=headers)
