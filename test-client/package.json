@@ -1,0 +1,26 @@
+{
+  "name": "neirofitness-test",
+  "version": "1.0.0",
+  "description": "Тест загрузки видео по кусочкам для NeiroFitnessApp",
+  "main": "test.js",
+  "scripts": {
+    "test": "node test.js",
+    "test:quick": "node test.js --quick",
+    "test:errors": "node test.js --errors",
+    "test:job": "node test.js --job",
+    "install-deps": "npm install"
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "form-data": "^4.0.0"
+  },
+  "keywords": [
+    "test",
+    "upload",
+    "chunks",
+    "video",
+    "api"
+  ],
+  "author": "NeiroFitnessApp",
+  "license": "MIT"
+}
