@@ -1,6 +1,5 @@
 .venv/
 .idea/
 __pycache__/
-requirements.txt
 docker-compose.yml
 node_modules/
