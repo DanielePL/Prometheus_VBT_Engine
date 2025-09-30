@@ -51,6 +51,7 @@ class StreamSession(BaseModel):
     result: Optional[Dict] = None
     output_file: Optional[str] = None
     error_message: Optional[str] = None
+    job_id: Optional[str] = None
 
 
 class ProcessingResult(BaseModel):
