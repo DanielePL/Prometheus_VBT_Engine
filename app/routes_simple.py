@@ -333,6 +333,25 @@ async def get_upload_status(upload_id: str, request: Request):
         "completed_at": session.completed_at
     }
 
+@job_router.get("/download/{job_id}")
+async def download_processed_video(job_id: str, request: Request):
+    """Скачать обработанное видео"""
+    jobs = request.app.state.jobs
+    if job_id not in jobs:
+        raise HTTPException(status_code=404, detail="Задача не найдена")
+    
+    job = jobs[job_id]
+    if job.status != "completed" or not job.output_file:
+        raise HTTPException(status_code=400, detail="Видео еще не готово")
+    
+    if not os.path.exists(job.output_file):
+        raise HTTPException(status_code=404, detail="Файл не найден")
+    
+    return FileResponse(
+        job.output_file,
+        media_type="video/mp4",
+        filename=f"processed_{job_id}.mp4"
+    )
 
 @upload_router.delete("/{upload_id}")
 async def cancel_upload(upload_id: str, request: Request):
