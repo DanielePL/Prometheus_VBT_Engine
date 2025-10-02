@@ -31,6 +31,8 @@ async def assemble_file_from_chunks(upload_session: UploadSession) -> str:
     """Сборка файла из частей"""
     try:
         # Создаем финальный файл
+        # Гарантируем наличие временной директории
+        os.makedirs(Config.TEMP_DIR, exist_ok=True)
         final_file_path = os.path.join(Config.TEMP_DIR, f"assembled_{upload_session.upload_id}.mp4")
         
         with open(final_file_path, "wb") as final_file:
@@ -109,6 +111,9 @@ def process_video_sync(job_id: str, input_path: str, output_path: str, jobs: Dic
         
         # Перемещаем результат в выходную директорию
         final_output = os.path.join(Config.OUTPUT_DIR, f"{job_id}_processed.mp4")
+        os.makedirs(os.path.dirname(final_output) or Config.OUTPUT_DIR, exist_ok=True)
+        if not os.path.exists(processed_path):
+            raise FileNotFoundError(f"Результирующий файл не найден: {processed_path}")
         shutil.move(processed_path, final_output)
         
         # Обновляем статус
@@ -166,6 +171,9 @@ def process_video_stream_sync(session_id: str, video_path: str, stream_sessions:
         
         # Перемещаем результат в выходную директорию
         final_output = os.path.join(Config.OUTPUT_DIR, f"{session_id}_processed.mp4")
+        os.makedirs(os.path.dirname(final_output) or Config.OUTPUT_DIR, exist_ok=True)
+        if not os.path.exists(processed_path):
+            raise FileNotFoundError(f"Результирующий файл не найден: {processed_path}")
         os.rename(processed_path, final_output)
         
         # Обновляем статус сессии

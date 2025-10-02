@@ -1,4 +1,5 @@
 import cv2
+import os
 import numpy as np
 from scipy.interpolate import interp1d
 from ultralytics import YOLO
@@ -155,6 +156,8 @@ def pick_bar_box(results, last_center: Tuple[int, int] | None) -> Dict | None:
 # ========= основной процесс =========
 def process_video(video_path: str, output_path: str) -> Tuple[Dict, str]:
     cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise FileNotFoundError(f"Входной файл не найден или не может быть открыт: {video_path}")
     frame_width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps          = cap.get(cv2.CAP_PROP_FPS) or 30.0
@@ -163,8 +166,15 @@ def process_video(video_path: str, output_path: str) -> Tuple[Dict, str]:
     start_frame = 1                 # не ждём 1 сек — начинаем сразу
     stop_frame  = total_frames      # до конца файла
 
+    # Ensure output directory exists
+    output_dir = os.path.dirname(output_path) or "."
+    os.makedirs(output_dir, exist_ok=True)
+
     fourcc = cv2.VideoWriter_fourcc(*'mp4v')
     out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
+    if not out.isOpened():
+        cap.release()
+        raise FileNotFoundError(f"Не удалось открыть выходной файл для записи: {output_path}")
 
     frames: List[np.ndarray] = []
     frame_idx = 0
