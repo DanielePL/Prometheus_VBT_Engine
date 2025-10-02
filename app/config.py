@@ -15,8 +15,8 @@ class Config:
     MAX_CONCURRENT_JOBS = 3  # Максимум одновременных задач
     
     # Директории
-    TEMP_DIR = "/tmp/neirofitness"
-    OUTPUT_DIR = "/tmp/neirofitness/output"
+    TEMP_DIR = "/uploads/neirofitness"
+    OUTPUT_DIR = "/uploads/neirofitness/output"
     
     # Настройки видео
     FRAME_RATE = 30
