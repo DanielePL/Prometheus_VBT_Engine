@@ -37,11 +37,11 @@ RUN pip install --upgrade pip wheel setuptools \
 COPY . /app
 
 # Создаем директории для временных файлов
-RUN mkdir -p /tmp/neirofitness /tmp/neirofitness/output
+RUN mkdir -p /uploads/neirofitness /uploads/neirofitness/output
 
 # Создаем непривилегированного пользователя
 RUN useradd -ms /bin/bash appuser \
- && chown -R appuser:appuser /app /tmp/neirofitness
+ && chown -R appuser:appuser /app /uploads/neirofitness
 USER appuser
 
 # Открываем порт
