@@ -24,25 +24,24 @@ RUN apt-get update && apt-get install -y \
     libpng-dev \
     libtiff-dev \
     wget \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* /var/cache/apt/*
+
+# Создаем непривилегированного пользователя
+RUN useradd -ms /bin/bash appuser && \
+    mkdir -p /uploads/neirofitness/output && \
+    chown appuser:appuser -R /uploads
+USER appuser
 
 WORKDIR /app
 
 # Копируем и устанавливаем зависимости
-COPY requirements.txt /app/requirements.txt
+COPY --chown=appuser:appuser requirements.txt /app/requirements.txt
 RUN pip install --upgrade pip wheel setuptools \
  && pip install -r /app/requirements.txt
 
 # Копируем код приложения
-COPY . /app
+COPY --chown=appuser:appuser . .
 
-# Создаем директории для временных файлов
-RUN mkdir -p /uploads/neirofitness /uploads/neirofitness/output
-
-# Создаем непривилегированного пользователя
-RUN useradd -ms /bin/bash appuser \
- && chown -R appuser:appuser /app /uploads/neirofitness
-USER appuser
 
 # Открываем порт
 EXPOSE 8000
