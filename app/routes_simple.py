@@ -403,6 +403,10 @@ async def webrtc_page():
             </div>
             
             <div id="status" class="status" style="display: none;"></div>
+            <div id="recordingStatus" style="display: none; padding: 10px; margin: 10px 0; background: #e8f5e9; border: 1px solid #4caf50; border-radius: 5px;">
+                <strong>🔴 Запись идёт...</strong>
+                <div class="muted" style="font-size: 12px; margin-top: 5px;">Трек получен и запись началась на сервере</div>
+            </div>
             
             <video id="localVideo" autoplay muted playsinline></video>
             <video id="remoteVideo" autoplay playsinline></video>
@@ -426,49 +430,119 @@ async def webrtc_page():
 
             async function startStream() {
                 try {
+                    console.log('🎬 Начало захвата камеры...');
+                    showStatus('Получение доступа к камере...', 'processing');
+                    
                     // Получаем доступ к камере
                     localStream = await navigator.mediaDevices.getUserMedia({
                         video: { width: 640, height: 480 },
                         audio: false
                     });
                     
+                    console.log('✅ Камера успешно захвачена');
+                    console.log('📹 Треки:', localStream.getTracks().map(t => ({ kind: t.kind, id: t.id, enabled: t.enabled })));
+                    
                     document.getElementById('localVideo').srcObject = localStream;
                     document.getElementById('startBtn').disabled = true;
                     document.getElementById('stopBtn').disabled = false;
                     document.getElementById('processBtn').disabled = false;
                     
-                    showStatus('Стрим начат', 'processing');
+                    showStatus('Камера захвачена, устанавливается соединение...', 'processing');
 
                     // Создаем WebSocket и RTCPeerConnection сразу при старте, чтобы начать запись на сервере
                     sessionId = generateSessionId();
+                    console.log('🆔 Session ID:', sessionId);
+                    
                     const wsProtocol = location.protocol === 'https:' ? 'wss' : 'ws';
                     const wsBase = `${wsProtocol}://${location.host}`;
-                    ws = new WebSocket(`${wsBase}/api/v1/ws/${sessionId}`);
+                    const wsUrl = `${wsBase}/api/v1/ws/${sessionId}`;
+                    
+                    console.log('🔌 Подключение к WebSocket:', wsUrl);
+                    ws = new WebSocket(wsUrl);
 
                     ws.onopen = async () => {
+                        console.log('✅ WebSocket подключен успешно');
+                        showStatus('WebSocket подключен, создаётся RTCPeerConnection...', 'processing');
+                        
                         try {
+                            console.log('🔧 Создание RTCPeerConnection...');
                             pc = new RTCPeerConnection({
                                 iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
                             });
+                            console.log('✅ RTCPeerConnection создан');
 
+                            // Диагностика состояния соединения
+                            pc.onconnectionstatechange = () => {
+                                console.log('🔌 Состояние соединения:', pc.connectionState);
+                                
+                                if (pc.connectionState === 'connected') {
+                                    console.log('🎉 WebRTC соединение успешно установлено!');
+                                    showStatus('WebRTC соединение установлено. Запись началась.', 'processing');
+                                    // Показываем индикатор записи только при успешном соединении
+                                    document.getElementById('recordingStatus').style.display = 'block';
+                                } else if (pc.connectionState === 'connecting') {
+                                    console.log('⏳ Устанавливается WebRTC соединение...');
+                                    showStatus('Устанавливается соединение...', 'processing');
+                                } else if (pc.connectionState === 'failed') {
+                                    console.error('❌ WebRTC соединение не удалось установить');
+                                    showStatus('WebRTC соединение не удалось. Проверьте сеть и перезагрузите страницу.', 'failed');
+                                    document.getElementById('recordingStatus').style.display = 'none';
+                                } else if (pc.connectionState === 'disconnected') {
+                                    console.warn('⚠️ WebRTC соединение разорвано');
+                                    showStatus('WebRTC соединение потеряно: ' + pc.connectionState, 'failed');
+                                    document.getElementById('recordingStatus').style.display = 'none';
+                                }
+                            };
+
+                            pc.oniceconnectionstatechange = () => {
+                                console.log('❄️ ICE состояние:', pc.iceConnectionState);
+                                
+                                if (pc.iceConnectionState === 'checking') {
+                                    console.log('🔍 Проверка ICE кандидатов...');
+                                } else if (pc.iceConnectionState === 'connected') {
+                                    console.log('✅ ICE соединение установлено');
+                                } else if (pc.iceConnectionState === 'completed') {
+                                    console.log('✅ ICE соединение завершено (все кандидаты проверены)');
+                                } else if (pc.iceConnectionState === 'failed') {
+                                    console.error('❌ ICE соединение не удалось');
+                                    showStatus('Не удалось установить соединение. Проверьте сеть.', 'failed');
+                                } else if (pc.iceConnectionState === 'disconnected') {
+                                    console.warn('⚠️ ICE соединение потеряно');
+                                }
+                            };
+
+                            // Добавляем видео треки
+                            console.log('📹 Доступные треки:', localStream.getTracks().length);
                             localStream.getTracks().forEach(track => {
-                                pc.addTrack(track, localStream);
+                                console.log('➕ Добавляем трек:', track.kind, track.id, 'enabled:', track.enabled);
+                                const sender = pc.addTrack(track, localStream);
+                                console.log('✅ Трек добавлен в peer connection, sender:', sender);
                             });
 
                             pc.ontrack = (event) => {
+                                console.log('📥 Получен входящий трек от сервера:', event.track.kind);
                                 document.getElementById('remoteVideo').srcObject = event.streams[0];
                             };
 
+                            console.log('📝 Создание offer...');
                             const offer = await pc.createOffer();
+                            console.log('✅ Offer создан');
+                            
+                            console.log('📝 Установка localDescription...');
                             await pc.setLocalDescription(offer);
+                            console.log('✅ LocalDescription установлен');
 
                             // Ждём пока ICE-gathering завершится, чтобы sdp включал кандидатов
+                            console.log('⏳ Ожидание завершения ICE gathering...');
                             await new Promise(resolve => {
                                 if (pc.iceGatheringState === 'complete') {
+                                    console.log('✅ ICE gathering уже завершен');
                                     resolve();
                                 } else {
                                     const checkState = () => {
+                                        console.log('🔄 ICE gathering состояние:', pc.iceGatheringState);
                                         if (pc.iceGatheringState === 'complete') {
+                                            console.log('✅ ICE gathering завершен');
                                             pc.removeEventListener('icegatheringstatechange', checkState);
                                             resolve();
                                         }
@@ -477,10 +551,15 @@ async def webrtc_page():
                                 }
                             });
 
+                            console.log('📤 Отправка offer на сервер...');
+                            console.log('SDP тип:', pc.localDescription.type);
+                            console.log('SDP содержит треки:', pc.localDescription.sdp.includes('m=video'));
+                            
                             ws.send(JSON.stringify({
                                 type: 'offer',
                                 sdp: pc.localDescription.sdp
                             }));
+                            console.log('✅ Offer отправлен');
                         } catch (e) {
                             console.error('Ошибка инициализации WebRTC:', e);
                             showStatus('Ошибка инициализации WebRTC', 'failed');
@@ -496,18 +575,38 @@ async def webrtc_page():
                                     type: 'answer',
                                     sdp: data.sdp
                                 }));
+                                console.log('✅ WebRTC answer установлен успешно');
+                                
+                                // Ждём установления соединения (максимум 10 секунд)
+                                const connectionTimeout = setTimeout(() => {
+                                    if (pc && pc.connectionState !== 'connected') {
+                                        console.error('❌ WebRTC соединение не установлено за 10 секунд');
+                                        showStatus('WebRTC соединение не установлено. Попробуйте перезагрузить страницу.', 'failed');
+                                    }
+                                }, 10000);
+                                
+                                // Проверяем установление соединения
+                                if (pc.connectionState === 'connected') {
+                                    clearTimeout(connectionTimeout);
+                                    console.log('🎉 WebRTC соединение установлено!');
+                                }
                             } catch (e) {
-                                console.error('Ошибка установки answer:', e);
+                                console.error('❌ Ошибка установки answer:', e);
+                                showStatus('Ошибка WebRTC: ' + e.message, 'failed');
                             }
                         } else if (data.type === 'result') {
                             showResult(data.result);
                         } else if (data.type === 'status') {
-                            showStatus(data.message, data.status);
+                            // Не перезаписываем статус если соединение уже установлено
+                            if (pc.connectionState !== 'connected') {
+                                showStatus(data.message, data.status);
+                            }
                         } else if (data.type === 'processing_started') {
                             jobId = data.job_id;
                             showStatus(`Обработка начата. job_id: ${jobId}`, 'processing');
                             showProgress(0, jobId);
                             startJobPolling(jobId);
+                            document.getElementById('recordingStatus').style.display = 'none';
                         }
                     };
 
@@ -520,8 +619,29 @@ async def webrtc_page():
                         showStatus('Соединение закрыто', 'completed');
                     };
                 } catch (error) {
-                    console.error('Ошибка доступа к камере:', error);
-                    showStatus('Ошибка доступа к камере: ' + error.message, 'failed');
+                    console.error('❌ ОШИБКА при запуске стрима:', error);
+                    console.error('Тип ошибки:', error.name);
+                    console.error('Сообщение:', error.message);
+                    
+                    let errorMessage = 'Ошибка: ';
+                    if (error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
+                        errorMessage += 'Доступ к камере запрещён. Разрешите доступ в настройках браузера.';
+                    } else if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
+                        errorMessage += 'Камера не найдена. Подключите камеру.';
+                    } else if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
+                        errorMessage += 'Камера занята другим приложением. Закройте другие приложения.';
+                    } else if (error.name === 'OverconstrainedError' || error.name === 'ConstraintNotSatisfiedError') {
+                        errorMessage += 'Камера не поддерживает запрошенные параметры.';
+                    } else {
+                        errorMessage += error.message || 'Неизвестная ошибка';
+                    }
+                    
+                    showStatus(errorMessage, 'failed');
+                    
+                    // Сбрасываем кнопки
+                    document.getElementById('startBtn').disabled = false;
+                    document.getElementById('stopBtn').disabled = true;
+                    document.getElementById('processBtn').disabled = true;
                 }
             }
 
@@ -569,6 +689,7 @@ async def webrtc_page():
                     document.getElementById('startBtn').disabled = false;
                     document.getElementById('stopBtn').disabled = true;
                     document.getElementById('processBtn').disabled = true;
+                    document.getElementById('recordingStatus').style.display = 'none';
                     showStatus('Стрим остановлен', 'completed');
                 }
             }
@@ -726,6 +847,8 @@ async def websocket_endpoint(
     await websocket.accept()
     active_connections[session_id] = websocket
     
+    logger.info(f"🔌 WebSocket подключён: session_id={session_id}")
+    
     # Создаем сессию
     stream_sessions[session_id] = StreamSession(
         session_id=session_id,
@@ -733,10 +856,14 @@ async def websocket_endpoint(
         created_at=datetime.now()
     )
     
+    logger.info(f"📝 Создана сессия стрима: {session_id}")
+    
     try:
         while True:
             data = await websocket.receive_text()
             message = json.loads(data)
+            
+            logger.info(f"📨 Получено WebSocket сообщение от {session_id}: тип={message.get('type', 'unknown')}")
             
             if message["type"] == "offer":
                 # Обрабатываем WebRTC offer
@@ -758,10 +885,32 @@ async def websocket_endpoint(
             elif message["type"] == "process":
                 # Явный запрос на обработку записанного видео
                 input_path = os.path.join(Config.TEMP_DIR, f"input_{session_id}.mp4")
+                logger.info(f"Запрос обработки видео: {input_path}")
+                
                 if not os.path.exists(input_path):
+                    logger.error(f"Видео файл не найден для обработки: {input_path}")
+                    
+                    error_msg = "Нет записанного видео для обработки. Возможные причины:\n"
+                    error_msg += "- Запись еще не начата или не завершена\n"
+                    error_msg += "- Видео трек не был получен от клиента\n"
+                    error_msg += "- Нужно подождать несколько секунд после начала стрима"
+                    
                     await websocket.send_text(json.dumps({
                         "type": "status",
-                        "message": "Нет записанного видео для обработки",
+                        "message": error_msg,
+                        "status": "failed"
+                    }))
+                    continue
+                
+                # Проверяем размер файла
+                file_size = os.path.getsize(input_path)
+                logger.info(f"Обработка видео файла: {input_path}, размер: {file_size} байт")
+                
+                if file_size < 1024:  # Меньше 1KB - подозрительно малый файл
+                    logger.warning(f"Видео файл слишком маленький для обработки: {file_size} байт")
+                    await websocket.send_text(json.dumps({
+                        "type": "status",
+                        "message": f"Видео файл слишком маленький ({file_size} байт). Запишите больше видео перед обработкой.",
                         "status": "failed"
                     }))
                     continue
@@ -797,16 +946,62 @@ async def websocket_endpoint(
                     "job_id": job_id
                 }))
             elif message["type"] == "stop":
+                # Проверяем, был ли вообще отправлен offer
+                if session_id not in webrtc_handler.peer_connections:
+                    logger.error(f"❌ Получена команда 'stop' без предварительного 'offer' для сессии {session_id}")
+                    await websocket.send_text(json.dumps({
+                        "type": "status",
+                        "message": "Ошибка: WebRTC соединение не было установлено.\n\n"
+                                 "Возможные причины:\n"
+                                 "1. Камера не захвачена (проверьте разрешения браузера)\n"
+                                 "2. Ошибка при создании WebRTC соединения\n"
+                                 "3. Проблема с JavaScript в браузере\n\n"
+                                 "Откройте консоль браузера (F12) и проверьте ошибки!",
+                        "status": "failed"
+                    }))
+                    continue
+                
                 # Останавливаем запись, создаём задачу обработки и возвращаем job_id
                 try:
                     await webrtc_handler.close_connection(session_id)
                 except Exception as e:
                     logger.error(f"Ошибка при остановке записи {session_id}: {e}")
-                input_path = os.path.join(Config.TEMP_DIR, f"input_{session_id}.mp4")
-                if not os.path.exists(input_path):
                     await websocket.send_text(json.dumps({
                         "type": "status",
-                        "message": "Видео не записано",
+                        "message": f"Ошибка остановки записи: {str(e)}",
+                        "status": "failed"
+                    }))
+                    continue
+                    
+                input_path = os.path.join(Config.TEMP_DIR, f"input_{session_id}.mp4")
+                logger.info(f"Проверка наличия видео файла: {input_path}")
+                
+                if not os.path.exists(input_path):
+                    # Проверяем причину отсутствия файла
+                    was_recording = webrtc_handler.is_recording(session_id)
+                    logger.error(f"Видео файл не найден: {input_path}, запись велась: {was_recording}")
+                    
+                    error_msg = "Видео не записано. Возможные причины:\n"
+                    error_msg += "- Видео трек не был получен от клиента\n"
+                    error_msg += "- Стрим был слишком коротким\n"
+                    error_msg += "- Проблемы с WebRTC соединением"
+                    
+                    await websocket.send_text(json.dumps({
+                        "type": "status",
+                        "message": error_msg,
+                        "status": "failed"
+                    }))
+                    continue
+                
+                # Проверяем размер файла
+                file_size = os.path.getsize(input_path)
+                logger.info(f"Видео файл найден: {input_path}, размер: {file_size} байт")
+                
+                if file_size < 1024:  # Меньше 1KB - подозрительно малый файл
+                    logger.warning(f"Видео файл слишком маленький: {file_size} байт")
+                    await websocket.send_text(json.dumps({
+                        "type": "status",
+                        "message": f"Видео файл слишком маленький ({file_size} байт). Возможно стрим был слишком коротким.",
                         "status": "failed"
                     }))
                     continue

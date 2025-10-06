@@ -30,6 +30,7 @@ RUN apt-get update && apt-get install -y \
 RUN useradd -ms /bin/bash appuser && \
     mkdir -p /uploads/neirofitness/output && \
     chown appuser:appuser -R /uploads
+
 USER appuser
 
 WORKDIR /app
@@ -41,7 +42,6 @@ RUN pip install --upgrade pip wheel setuptools \
 
 # Копируем код приложения
 COPY --chown=appuser:appuser . .
-
 
 # Открываем порт
 EXPOSE 8000
