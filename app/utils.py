@@ -106,7 +106,6 @@ def process_video_sync(job_id: str, input_path: str, output_path: str, jobs: Dic
         # Обрабатываем видео
         jobs[job_id].progress = 30
         result, processed_path = process_video(input_path, output_path)
-        
         jobs[job_id].progress = 90
         
         # Перемещаем результат в выходную директорию
