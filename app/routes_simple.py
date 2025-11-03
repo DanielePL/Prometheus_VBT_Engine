@@ -1117,6 +1117,567 @@ async def download_processed_video(session_id: str, request: Request):
 
 
 # Главный маршрут
+@main_router.get("/video-upload")
+async def video_upload_page():
+    """Страница загрузки видео по частям"""
+    html_content = """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>NeiroFitnessApp - Загрузка видео</title>
+        <meta charset="UTF-8">
+        <style>
+            * { box-sizing: border-box; }
+            body { 
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                margin: 0;
+                padding: 20px;
+                background: #f5f5f5;
+            }
+            .container { 
+                max-width: 900px; 
+                margin: 0 auto;
+                background: white;
+                padding: 30px;
+                border-radius: 10px;
+                box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            }
+            h1 { 
+                color: #333;
+                margin-top: 0;
+                margin-bottom: 10px;
+            }
+            .subtitle {
+                color: #666;
+                margin-bottom: 30px;
+                font-size: 14px;
+            }
+            .upload-area {
+                border: 2px dashed #ccc;
+                border-radius: 8px;
+                padding: 40px;
+                text-align: center;
+                background: #fafafa;
+                transition: all 0.3s;
+                cursor: pointer;
+                margin-bottom: 20px;
+            }
+            .upload-area:hover {
+                border-color: #007bff;
+                background: #f0f7ff;
+            }
+            .upload-area.dragover {
+                border-color: #007bff;
+                background: #e7f3ff;
+            }
+            .upload-area input[type="file"] {
+                display: none;
+            }
+            .upload-icon {
+                font-size: 48px;
+                margin-bottom: 10px;
+            }
+            .file-info {
+                margin: 20px 0;
+                padding: 15px;
+                background: #f8f9fa;
+                border-radius: 5px;
+                display: none;
+            }
+            .file-info.active {
+                display: block;
+            }
+            .file-info-item {
+                margin: 5px 0;
+                color: #555;
+            }
+            .controls { 
+                margin: 20px 0; 
+            }
+            button { 
+                padding: 12px 24px; 
+                margin: 5px; 
+                background: #007bff; 
+                color: white; 
+                border: none; 
+                border-radius: 5px; 
+                cursor: pointer;
+                font-size: 16px;
+                transition: background 0.3s;
+            }
+            button:hover:not(:disabled) { 
+                background: #0056b3; 
+            }
+            button:disabled { 
+                background: #ccc; 
+                cursor: not-allowed; 
+            }
+            .status { 
+                margin: 15px 0; 
+                padding: 15px; 
+                border-radius: 5px;
+                display: none;
+            }
+            .status.active {
+                display: block;
+            }
+            .status.processing { 
+                background: #fff3cd; 
+                border: 1px solid #ffeaa7; 
+                color: #856404;
+            }
+            .status.completed { 
+                background: #d4edda; 
+                border: 1px solid #c3e6cb; 
+                color: #155724;
+            }
+            .status.failed { 
+                background: #f8d7da; 
+                border: 1px solid #f5c6cb; 
+                color: #721c24;
+            }
+            .result { 
+                margin: 20px 0; 
+                padding: 20px; 
+                background: #f8f9fa; 
+                border-radius: 5px;
+                display: none;
+            }
+            .result.active {
+                display: block;
+            }
+            .result h3 {
+                margin-top: 0;
+                color: #333;
+            }
+            .result-item {
+                margin: 10px 0;
+                padding: 8px;
+                background: white;
+                border-radius: 4px;
+            }
+            .result-label {
+                font-weight: bold;
+                color: #555;
+            }
+            .progress { 
+                margin: 15px 0; 
+                height: 20px; 
+                background: #eee; 
+                border-radius: 10px; 
+                overflow: hidden; 
+                border: 1px solid #ddd;
+            }
+            .progress-bar { 
+                height: 100%; 
+                width: 0%; 
+                background: linear-gradient(90deg, #28a745, #17a2b8); 
+                transition: width .3s ease;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-size: 12px;
+                font-weight: bold;
+            }
+            .progress-info {
+                margin: 10px 0;
+                color: #666;
+                font-size: 14px;
+            }
+            .muted { 
+                color: #666; 
+                font-size: 12px; 
+            }
+            .upload-progress {
+                margin-top: 15px;
+            }
+            .download-link {
+                display: inline-block;
+                margin-top: 15px;
+                padding: 10px 20px;
+                background: #28a745;
+                color: white;
+                text-decoration: none;
+                border-radius: 5px;
+                transition: background 0.3s;
+            }
+            .download-link:hover {
+                background: #218838;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>📹 Загрузка видео для обработки</h1>
+            <div class="subtitle">Выберите видео файл для анализа. Поддерживается загрузка больших файлов по частям.</div>
+            
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📁</div>
+                <div style="font-size: 18px; margin-bottom: 10px;">Перетащите файл сюда или нажмите для выбора</div>
+                <div class="muted">Поддерживаются форматы: MP4, AVI, MOV (максимум 500MB)</div>
+                <input type="file" id="fileInput" accept="video/*">
+            </div>
+            
+            <div class="file-info" id="fileInfo">
+                <div class="file-info-item"><strong>Файл:</strong> <span id="fileName"></span></div>
+                <div class="file-info-item"><strong>Размер:</strong> <span id="fileSize"></span></div>
+                <div class="file-info-item"><strong>Частей:</strong> <span id="fileChunks"></span></div>
+            </div>
+            
+            <div class="controls">
+                <button id="uploadBtn" onclick="startUpload()" disabled>Начать загрузку</button>
+                <button id="cancelBtn" onclick="cancelUpload()" disabled>Отменить</button>
+                <button id="resetBtn" onclick="resetUpload()" style="display: none;">Выбрать другой файл</button>
+            </div>
+            
+            <div id="status" class="status"></div>
+            
+            <div class="upload-progress" id="uploadProgress" style="display: none;">
+                <div class="progress-info" id="uploadProgressInfo">Загрузка файла...</div>
+                <div class="progress">
+                    <div id="uploadProgressBar" class="progress-bar">0%</div>
+                </div>
+            </div>
+            
+            <div id="progressWrap" style="display: none;">
+                <div class="progress-info" id="jobInfo"></div>
+                <div class="progress">
+                    <div id="progressBar" class="progress-bar">0%</div>
+                </div>
+                <div class="muted" id="progressText">Ожидание начала обработки...</div>
+            </div>
+            
+            <div id="result" class="result"></div>
+        </div>
+
+        <script>
+            const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB чанки
+            let selectedFile = null;
+            let uploadId = null;
+            let jobId = null;
+            let totalChunks = 0;
+            let uploadedChunks = 0;
+            let pollTimer = null;
+            let isUploading = false;
+
+            // Инициализация
+            const uploadArea = document.getElementById('uploadArea');
+            const fileInput = document.getElementById('fileInput');
+            const fileInfo = document.getElementById('fileInfo');
+            const uploadBtn = document.getElementById('uploadBtn');
+            const cancelBtn = document.getElementById('cancelBtn');
+
+            // Обработка клика по области загрузки
+            uploadArea.addEventListener('click', () => {
+                fileInput.click();
+            });
+
+            // Обработка выбора файла
+            fileInput.addEventListener('change', (e) => {
+                handleFileSelect(e.target.files[0]);
+            });
+
+            // Drag and drop
+            uploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+
+            uploadArea.addEventListener('dragleave', () => {
+                uploadArea.classList.remove('dragover');
+            });
+
+            uploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                if (e.dataTransfer.files.length > 0) {
+                    handleFileSelect(e.dataTransfer.files[0]);
+                }
+            });
+
+            function handleFileSelect(file) {
+                if (!file) return;
+                
+                // Проверка типа файла
+                if (!file.type.startsWith('video/')) {
+                    showStatus('Пожалуйста, выберите видео файл', 'failed');
+                    return;
+                }
+                
+                selectedFile = file;
+                const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+                totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+                
+                // Показываем информацию о файле
+                document.getElementById('fileName').textContent = file.name;
+                document.getElementById('fileSize').textContent = fileSizeMB + ' MB';
+                document.getElementById('fileChunks').textContent = totalChunks;
+                fileInfo.classList.add('active');
+                
+                uploadBtn.disabled = false;
+                showStatus('Файл выбран. Нажмите "Начать загрузку"', 'processing');
+            }
+
+            async function startUpload() {
+                if (!selectedFile || isUploading) return;
+                
+                isUploading = true;
+                uploadBtn.disabled = true;
+                cancelBtn.disabled = false;
+                document.getElementById('uploadProgress').style.display = 'block';
+                showStatus('Инициализация загрузки...', 'processing');
+                
+                try {
+                    // 1. Инициализация
+                    const initResponse = await fetch('/api/v1/upload/init', {
+                        method: 'POST',
+                        body: (() => {
+                            const formData = new FormData();
+                            formData.append('filename', selectedFile.name);
+                            formData.append('total_size', selectedFile.size.toString());
+                            formData.append('total_chunks', totalChunks.toString());
+                            return formData;
+                        })()
+                    });
+                    
+                    if (!initResponse.ok) {
+                        const error = await initResponse.json();
+                        throw new Error(error.detail || 'Ошибка инициализации');
+                    }
+                    
+                    const initData = await initResponse.json();
+                    uploadId = initData.upload_id;
+                    console.log('✅ Инициализация успешна. Upload ID:', uploadId);
+                    showStatus('Загрузка файла по частям...', 'processing');
+                    
+                    // 2. Загрузка чанков
+                    uploadedChunks = 0;
+                    for (let i = 0; i < totalChunks; i++) {
+                        if (!isUploading) {
+                            throw new Error('Загрузка отменена');
+                        }
+                        
+                        const start = i * CHUNK_SIZE;
+                        const end = Math.min(start + CHUNK_SIZE, selectedFile.size);
+                        const chunk = selectedFile.slice(start, end);
+                        
+                        const chunkFormData = new FormData();
+                        chunkFormData.append('upload_id', uploadId);
+                        chunkFormData.append('chunk_number', (i + 1).toString());
+                        chunkFormData.append('chunk', chunk, `chunk_${i}`);
+                        
+                        const chunkResponse = await fetch('/api/v1/upload/chunk', {
+                            method: 'POST',
+                            body: chunkFormData
+                        });
+                        
+                        if (!chunkResponse.ok) {
+                            const error = await chunkResponse.json();
+                            throw new Error(error.detail || `Ошибка загрузки части ${i + 1}`);
+                        }
+                        
+                        uploadedChunks++;
+                        const uploadProgress = ((uploadedChunks / totalChunks) * 100).toFixed(1);
+                        document.getElementById('uploadProgressBar').style.width = uploadProgress + '%';
+                        document.getElementById('uploadProgressBar').textContent = uploadProgress + '%';
+                        document.getElementById('uploadProgressInfo').textContent = 
+                            `Загружено ${uploadedChunks}/${totalChunks} частей (${uploadProgress}%)`;
+                        
+                        console.log(`📤 Чанк ${uploadedChunks}/${totalChunks} загружен (${uploadProgress}%)`);
+                    }
+                    
+                    // 3. Завершение загрузки
+                    showStatus('Завершение загрузки и запуск обработки...', 'processing');
+                    
+                    const completeFormData = new FormData();
+                    completeFormData.append('upload_id', uploadId);
+                    
+                    const completeResponse = await fetch('/api/v1/upload/complete', {
+                        method: 'POST',
+                        body: completeFormData
+                    });
+                    
+                    if (!completeResponse.ok) {
+                        const error = await completeResponse.json();
+                        throw new Error(error.detail || 'Ошибка завершения загрузки');
+                    }
+                    
+                    const completeData = await completeResponse.json();
+                    jobId = completeData.job_id;
+                    
+                    console.log('✅ Загрузка завершена. Job ID:', jobId);
+                    showStatus('Файл загружен успешно. Обработка начата...', 'completed');
+                    document.getElementById('uploadProgress').style.display = 'none';
+                    
+                    // Сбрасываем флаг загрузки, но оставляем кнопки отключенными до завершения обработки
+                    isUploading = false;
+                    uploadBtn.disabled = true;
+                    cancelBtn.disabled = true;
+                    
+                    // 4. Отслеживание обработки
+                    showProgress(0, jobId);
+                    startJobPolling(jobId);
+                    
+                } catch (error) {
+                    console.error('❌ Ошибка загрузки:', error);
+                    showStatus('Ошибка: ' + error.message, 'failed');
+                    document.getElementById('uploadProgress').style.display = 'none';
+                    isUploading = false;
+                    uploadBtn.disabled = false;
+                    cancelBtn.disabled = true;
+                }
+            }
+
+            function cancelUpload() {
+                if (confirm('Вы уверены, что хотите отменить загрузку?')) {
+                    isUploading = false;
+                    uploadBtn.disabled = false;
+                    cancelBtn.disabled = true;
+                    document.getElementById('uploadProgress').style.display = 'none';
+                    document.getElementById('progressWrap').style.display = 'none';
+                    if (pollTimer) clearInterval(pollTimer);
+                    showStatus('Загрузка отменена', 'failed');
+                    
+                    if (uploadId) {
+                        // Отменяем загрузку на сервере
+                        fetch(`/api/v1/upload/${uploadId}`, {
+                            method: 'DELETE'
+                        }).catch(err => console.error('Ошибка отмены загрузки:', err));
+                    }
+                }
+            }
+
+            function resetUpload() {
+                // Сбрасываем все переменные
+                selectedFile = null;
+                uploadId = null;
+                jobId = null;
+                totalChunks = 0;
+                uploadedChunks = 0;
+                isUploading = false;
+                
+                // Очищаем интервалы
+                if (pollTimer) {
+                    clearInterval(pollTimer);
+                    pollTimer = null;
+                }
+                
+                // Сбрасываем UI
+                fileInput.value = '';
+                fileInfo.classList.remove('active');
+                document.getElementById('uploadProgress').style.display = 'none';
+                document.getElementById('progressWrap').style.display = 'none';
+                document.getElementById('result').classList.remove('active');
+                document.getElementById('status').classList.remove('active');
+                document.getElementById('resetBtn').style.display = 'none';
+                
+                // Сбрасываем кнопки
+                uploadBtn.disabled = true;
+                cancelBtn.disabled = true;
+            }
+
+            function showStatus(message, status) {
+                const statusDiv = document.getElementById('status');
+                statusDiv.textContent = message;
+                statusDiv.className = `status ${status} active`;
+            }
+
+            function showProgress(percent, id) {
+                const wrap = document.getElementById('progressWrap');
+                const bar = document.getElementById('progressBar');
+                const text = document.getElementById('progressText');
+                const info = document.getElementById('jobInfo');
+                wrap.style.display = 'block';
+                const progressValue = Math.max(0, Math.min(100, percent));
+                bar.style.width = progressValue + '%';
+                bar.textContent = progressValue + '%';
+                text.textContent = id ? `Обработка задачи ${id}...` : 'Ожидание...';
+                info.textContent = id ? `Job ID: ${id}` : '';
+            }
+
+            function showResult(result) {
+                const resultDiv = document.getElementById('result');
+                resultDiv.innerHTML = `
+                    <h3>✅ Результат обработки:</h3>
+                    <div class="result-item">
+                        <span class="result-label">Повторения:</span> ${result.reps || 'N/A'}
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Скорость:</span> ${result.velocity || 'N/A'}
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Точность:</span> ${result.bar_path_accuracy_percent || 'N/A'}%
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Путь штанги:</span> ${result.bar_path || 'N/A'}
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Усталость:</span> ${result.fatigue || 'N/A'}
+                    </div>
+                    <div class="result-item">
+                        <span class="result-label">Время под напряжением:</span> ${result.tut || 'N/A'} сек
+                    </div>
+                    ${jobId ? `<a href="/api/v1/download/${jobId}" class="download-link">📥 Скачать обработанное видео</a>` : ''}
+                `;
+                resultDiv.classList.add('active');
+                showProgress(100, jobId);
+            }
+
+            function startJobPolling(id) {
+                if (pollTimer) clearInterval(pollTimer);
+                pollTimer = setInterval(async () => {
+                    try {
+                        const res = await fetch(`/api/v1/job/${id}`);
+                        if (!res.ok) return;
+                        const job = await res.json();
+                        
+                        if ('progress' in job) {
+                            showProgress(job.progress || 0, id);
+                        }
+                        
+                        if (job.status === 'completed') {
+                            clearInterval(pollTimer);
+                            showProgress(100, id);
+                            showStatus('Обработка завершена успешно!', 'completed');
+                            
+                            // Разрешаем загрузку нового файла
+                            uploadBtn.disabled = false;
+                            cancelBtn.disabled = true;
+                            document.getElementById('resetBtn').style.display = 'inline-block';
+                            
+                            try {
+                                const rr = await fetch(`/api/v1/result/${id}`);
+                                if (rr.ok) {
+                                    const data = await rr.json();
+                                    if (data && data.result) {
+                                        showResult(data.result);
+                                    }
+                                }
+                            } catch (e) {
+                                console.error('Ошибка получения результата:', e);
+                            }
+                        } else if (job.status === 'failed') {
+                            clearInterval(pollTimer);
+                            showStatus('Ошибка обработки: ' + (job.error_message || 'Неизвестная ошибка'), 'failed');
+                            
+                            // Разрешаем загрузку нового файла даже при ошибке
+                            uploadBtn.disabled = false;
+                            cancelBtn.disabled = true;
+                            document.getElementById('resetBtn').style.display = 'inline-block';
+                        }
+                    } catch (e) {
+                        console.error('Ошибка запроса статуса job:', e);
+                    }
+                }, 2000);
+            }
+        </script>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html_content)
+
+
 @main_router.get("/")
 async def root():
     """Корневой эндпоинт"""
@@ -1147,6 +1708,10 @@ async def root():
                 "session_info": "/api/v1/session/{session_id}",
                 "session_result": "/api/v1/session/{session_id}/result",
                 "session_download": "/api/v1/session/{session_id}/download"
+            },
+            "video_upload": {
+                "page": "/video-upload",
+                "description": "Веб-интерфейс для загрузки видео по частям"
             },
             "job_management": {
                 "status": "/api/v1/job/{job_id}",
