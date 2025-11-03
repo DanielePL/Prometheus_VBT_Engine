@@ -5,7 +5,7 @@ from ultralytics import YOLO
 from typing import Tuple, Dict
 
 # ===== модель =====
-model = YOLO('app/models/best.pt')
+model = YOLO('app/models/bestv2.pt')
 
 # ===== константы/гиперпараметры =====
 BARBELL_WEIGHT_KG = 60
@@ -156,8 +156,6 @@ def process_video(
     one_rm_kg: float = 90,
 ) -> Tuple[Dict, str]:
 
-    model_detect = YOLO(str(model))
-
     # Open video for reading and writing
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
@@ -263,9 +261,9 @@ def process_video(
     while True:
         
         frame_idx += 1
-        print(frame.shape, frame.dtype)
+        
         # Detection with tracking
-        results_detect = model_detect.track(
+        results_detect = model.track(
             frame,
             tracker="bytetrack.yaml",
             persist=True,

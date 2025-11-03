@@ -1119,12 +1119,12 @@ async def download_processed_video(session_id: str, request: Request):
 # Главный маршрут
 @main_router.get("/video-upload")
 async def video_upload_page():
-    """Страница загрузки видео по частям"""
+    """Video upload page with chunked upload"""
     html_content = """
     <!DOCTYPE html>
     <html>
     <head>
-        <title>NeiroFitnessApp - Загрузка видео</title>
+        <title>NeiroFitnessApp - Video Upload</title>
         <meta charset="UTF-8">
         <style>
             * { box-sizing: border-box; }
@@ -1309,32 +1309,32 @@ async def video_upload_page():
     </head>
     <body>
         <div class="container">
-            <h1>📹 Загрузка видео для обработки</h1>
-            <div class="subtitle">Выберите видео файл для анализа. Поддерживается загрузка больших файлов по частям.</div>
+            <h1>📹 Video Upload for Processing</h1>
+            <div class="subtitle">Select a video file for analysis. Large file upload in chunks is supported.</div>
             
             <div class="upload-area" id="uploadArea">
                 <div class="upload-icon">📁</div>
-                <div style="font-size: 18px; margin-bottom: 10px;">Перетащите файл сюда или нажмите для выбора</div>
-                <div class="muted">Поддерживаются форматы: MP4, AVI, MOV (максимум 500MB)</div>
+                <div style="font-size: 18px; margin-bottom: 10px;">Drag and drop a file here or click to select</div>
+                <div class="muted">Supported formats: MP4, AVI, MOV (max 500MB)</div>
                 <input type="file" id="fileInput" accept="video/*">
             </div>
             
             <div class="file-info" id="fileInfo">
-                <div class="file-info-item"><strong>Файл:</strong> <span id="fileName"></span></div>
-                <div class="file-info-item"><strong>Размер:</strong> <span id="fileSize"></span></div>
-                <div class="file-info-item"><strong>Частей:</strong> <span id="fileChunks"></span></div>
+                <div class="file-info-item"><strong>File:</strong> <span id="fileName"></span></div>
+                <div class="file-info-item"><strong>Size:</strong> <span id="fileSize"></span></div>
+                <div class="file-info-item"><strong>Chunks:</strong> <span id="fileChunks"></span></div>
             </div>
             
             <div class="controls">
-                <button id="uploadBtn" onclick="startUpload()" disabled>Начать загрузку</button>
-                <button id="cancelBtn" onclick="cancelUpload()" disabled>Отменить</button>
-                <button id="resetBtn" onclick="resetUpload()" style="display: none;">Выбрать другой файл</button>
+                <button id="uploadBtn" onclick="startUpload()" disabled>Start Upload</button>
+                <button id="cancelBtn" onclick="cancelUpload()" disabled>Cancel</button>
+                <button id="resetBtn" onclick="resetUpload()" style="display: none;">Select Another File</button>
             </div>
             
             <div id="status" class="status"></div>
             
             <div class="upload-progress" id="uploadProgress" style="display: none;">
-                <div class="progress-info" id="uploadProgressInfo">Загрузка файла...</div>
+                <div class="progress-info" id="uploadProgressInfo">Uploading file...</div>
                 <div class="progress">
                     <div id="uploadProgressBar" class="progress-bar">0%</div>
                 </div>
@@ -1345,14 +1345,14 @@ async def video_upload_page():
                 <div class="progress">
                     <div id="progressBar" class="progress-bar">0%</div>
                 </div>
-                <div class="muted" id="progressText">Ожидание начала обработки...</div>
+                <div class="muted" id="progressText">Waiting for processing to start...</div>
             </div>
             
             <div id="result" class="result"></div>
         </div>
 
         <script>
-            const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB чанки
+            const CHUNK_SIZE = 10 * 1024 * 1024; // 10MB chunks
             let selectedFile = null;
             let uploadId = null;
             let jobId = null;
@@ -1361,19 +1361,19 @@ async def video_upload_page():
             let pollTimer = null;
             let isUploading = false;
 
-            // Инициализация
+            // Initialization
             const uploadArea = document.getElementById('uploadArea');
             const fileInput = document.getElementById('fileInput');
             const fileInfo = document.getElementById('fileInfo');
             const uploadBtn = document.getElementById('uploadBtn');
             const cancelBtn = document.getElementById('cancelBtn');
 
-            // Обработка клика по области загрузки
+            // Handle click on upload area
             uploadArea.addEventListener('click', () => {
                 fileInput.click();
             });
 
-            // Обработка выбора файла
+            // Handle file selection
             fileInput.addEventListener('change', (e) => {
                 handleFileSelect(e.target.files[0]);
             });
@@ -1399,9 +1399,9 @@ async def video_upload_page():
             function handleFileSelect(file) {
                 if (!file) return;
                 
-                // Проверка типа файла
+                // Check file type
                 if (!file.type.startsWith('video/')) {
-                    showStatus('Пожалуйста, выберите видео файл', 'failed');
+                    showStatus('Please select a video file', 'failed');
                     return;
                 }
                 
@@ -1409,14 +1409,14 @@ async def video_upload_page():
                 const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
                 totalChunks = Math.ceil(file.size / CHUNK_SIZE);
                 
-                // Показываем информацию о файле
+                // Show file information
                 document.getElementById('fileName').textContent = file.name;
                 document.getElementById('fileSize').textContent = fileSizeMB + ' MB';
                 document.getElementById('fileChunks').textContent = totalChunks;
                 fileInfo.classList.add('active');
                 
                 uploadBtn.disabled = false;
-                showStatus('Файл выбран. Нажмите "Начать загрузку"', 'processing');
+                showStatus('File selected. Click "Start Upload"', 'processing');
             }
 
             async function startUpload() {
@@ -1426,10 +1426,10 @@ async def video_upload_page():
                 uploadBtn.disabled = true;
                 cancelBtn.disabled = false;
                 document.getElementById('uploadProgress').style.display = 'block';
-                showStatus('Инициализация загрузки...', 'processing');
+                showStatus('Initializing upload...', 'processing');
                 
                 try {
-                    // 1. Инициализация
+                    // 1. Initialize upload
                     const initResponse = await fetch('/api/v1/upload/init', {
                         method: 'POST',
                         body: (() => {
@@ -1443,19 +1443,19 @@ async def video_upload_page():
                     
                     if (!initResponse.ok) {
                         const error = await initResponse.json();
-                        throw new Error(error.detail || 'Ошибка инициализации');
+                        throw new Error(error.detail || 'Initialization error');
                     }
                     
                     const initData = await initResponse.json();
                     uploadId = initData.upload_id;
-                    console.log('✅ Инициализация успешна. Upload ID:', uploadId);
-                    showStatus('Загрузка файла по частям...', 'processing');
+                    console.log('✅ Initialization successful. Upload ID:', uploadId);
+                    showStatus('Uploading file in chunks...', 'processing');
                     
-                    // 2. Загрузка чанков
+                    // 2. Upload chunks
                     uploadedChunks = 0;
                     for (let i = 0; i < totalChunks; i++) {
                         if (!isUploading) {
-                            throw new Error('Загрузка отменена');
+                            throw new Error('Upload cancelled');
                         }
                         
                         const start = i * CHUNK_SIZE;
@@ -1474,7 +1474,7 @@ async def video_upload_page():
                         
                         if (!chunkResponse.ok) {
                             const error = await chunkResponse.json();
-                            throw new Error(error.detail || `Ошибка загрузки части ${i + 1}`);
+                            throw new Error(error.detail || `Error uploading chunk ${i + 1}`);
                         }
                         
                         uploadedChunks++;
@@ -1482,13 +1482,13 @@ async def video_upload_page():
                         document.getElementById('uploadProgressBar').style.width = uploadProgress + '%';
                         document.getElementById('uploadProgressBar').textContent = uploadProgress + '%';
                         document.getElementById('uploadProgressInfo').textContent = 
-                            `Загружено ${uploadedChunks}/${totalChunks} частей (${uploadProgress}%)`;
+                            `Uploaded ${uploadedChunks}/${totalChunks} chunks (${uploadProgress}%)`;
                         
-                        console.log(`📤 Чанк ${uploadedChunks}/${totalChunks} загружен (${uploadProgress}%)`);
+                        console.log(`📤 Chunk ${uploadedChunks}/${totalChunks} uploaded (${uploadProgress}%)`);
                     }
                     
-                    // 3. Завершение загрузки
-                    showStatus('Завершение загрузки и запуск обработки...', 'processing');
+                    // 3. Complete upload
+                    showStatus('Completing upload and starting processing...', 'processing');
                     
                     const completeFormData = new FormData();
                     completeFormData.append('upload_id', uploadId);
@@ -1500,28 +1500,28 @@ async def video_upload_page():
                     
                     if (!completeResponse.ok) {
                         const error = await completeResponse.json();
-                        throw new Error(error.detail || 'Ошибка завершения загрузки');
+                        throw new Error(error.detail || 'Error completing upload');
                     }
                     
                     const completeData = await completeResponse.json();
                     jobId = completeData.job_id;
                     
-                    console.log('✅ Загрузка завершена. Job ID:', jobId);
-                    showStatus('Файл загружен успешно. Обработка начата...', 'completed');
+                    console.log('✅ Upload completed. Job ID:', jobId);
+                    showStatus('File uploaded successfully. Processing started...', 'completed');
                     document.getElementById('uploadProgress').style.display = 'none';
                     
-                    // Сбрасываем флаг загрузки, но оставляем кнопки отключенными до завершения обработки
+                    // Reset upload flag but keep buttons disabled until processing completes
                     isUploading = false;
                     uploadBtn.disabled = true;
                     cancelBtn.disabled = true;
                     
-                    // 4. Отслеживание обработки
+                    // 4. Track processing
                     showProgress(0, jobId);
                     startJobPolling(jobId);
                     
                 } catch (error) {
-                    console.error('❌ Ошибка загрузки:', error);
-                    showStatus('Ошибка: ' + error.message, 'failed');
+                    console.error('❌ Upload error:', error);
+                    showStatus('Error: ' + error.message, 'failed');
                     document.getElementById('uploadProgress').style.display = 'none';
                     isUploading = false;
                     uploadBtn.disabled = false;
@@ -1530,26 +1530,26 @@ async def video_upload_page():
             }
 
             function cancelUpload() {
-                if (confirm('Вы уверены, что хотите отменить загрузку?')) {
+                if (confirm('Are you sure you want to cancel the upload?')) {
                     isUploading = false;
                     uploadBtn.disabled = false;
                     cancelBtn.disabled = true;
                     document.getElementById('uploadProgress').style.display = 'none';
                     document.getElementById('progressWrap').style.display = 'none';
                     if (pollTimer) clearInterval(pollTimer);
-                    showStatus('Загрузка отменена', 'failed');
+                    showStatus('Upload cancelled', 'failed');
                     
                     if (uploadId) {
-                        // Отменяем загрузку на сервере
+                        // Cancel upload on server
                         fetch(`/api/v1/upload/${uploadId}`, {
                             method: 'DELETE'
-                        }).catch(err => console.error('Ошибка отмены загрузки:', err));
+                        }).catch(err => console.error('Error cancelling upload:', err));
                     }
                 }
             }
 
             function resetUpload() {
-                // Сбрасываем все переменные
+                // Reset all variables
                 selectedFile = null;
                 uploadId = null;
                 jobId = null;
@@ -1557,13 +1557,13 @@ async def video_upload_page():
                 uploadedChunks = 0;
                 isUploading = false;
                 
-                // Очищаем интервалы
+                // Clear intervals
                 if (pollTimer) {
                     clearInterval(pollTimer);
                     pollTimer = null;
                 }
                 
-                // Сбрасываем UI
+                // Reset UI
                 fileInput.value = '';
                 fileInfo.classList.remove('active');
                 document.getElementById('uploadProgress').style.display = 'none';
@@ -1572,7 +1572,7 @@ async def video_upload_page():
                 document.getElementById('status').classList.remove('active');
                 document.getElementById('resetBtn').style.display = 'none';
                 
-                // Сбрасываем кнопки
+                // Reset buttons
                 uploadBtn.disabled = true;
                 cancelBtn.disabled = true;
             }
@@ -1592,33 +1592,33 @@ async def video_upload_page():
                 const progressValue = Math.max(0, Math.min(100, percent));
                 bar.style.width = progressValue + '%';
                 bar.textContent = progressValue + '%';
-                text.textContent = id ? `Обработка задачи ${id}...` : 'Ожидание...';
+                text.textContent = id ? `Processing job ${id}...` : 'Waiting...';
                 info.textContent = id ? `Job ID: ${id}` : '';
             }
 
             function showResult(result) {
                 const resultDiv = document.getElementById('result');
                 resultDiv.innerHTML = `
-                    <h3>✅ Результат обработки:</h3>
+                    <h3>✅ Processing Result:</h3>
                     <div class="result-item">
-                        <span class="result-label">Повторения:</span> ${result.reps || 'N/A'}
+                        <span class="result-label">Reps:</span> ${result.reps || 'N/A'}
                     </div>
                     <div class="result-item">
-                        <span class="result-label">Скорость:</span> ${result.velocity || 'N/A'}
+                        <span class="result-label">Velocity:</span> ${result.velocity || 'N/A'}
                     </div>
                     <div class="result-item">
-                        <span class="result-label">Точность:</span> ${result.bar_path_accuracy_percent || 'N/A'}%
+                        <span class="result-label">Accuracy:</span> ${result.bar_path_accuracy_percent || 'N/A'}%
                     </div>
                     <div class="result-item">
-                        <span class="result-label">Путь штанги:</span> ${result.bar_path || 'N/A'}
+                        <span class="result-label">Bar Path:</span> ${result.bar_path || 'N/A'}
                     </div>
                     <div class="result-item">
-                        <span class="result-label">Усталость:</span> ${result.fatigue || 'N/A'}
+                        <span class="result-label">Fatigue:</span> ${result.fatigue || 'N/A'}
                     </div>
                     <div class="result-item">
-                        <span class="result-label">Время под напряжением:</span> ${result.tut || 'N/A'} сек
+                        <span class="result-label">Time Under Tension:</span> ${result.tut || 'N/A'} sec
                     </div>
-                    ${jobId ? `<a href="/api/v1/download/${jobId}" class="download-link">📥 Скачать обработанное видео</a>` : ''}
+                    ${jobId ? `<a href="/api/v1/download/${jobId}" class="download-link">📥 Download Processed Video</a>` : ''}
                 `;
                 resultDiv.classList.add('active');
                 showProgress(100, jobId);
@@ -1639,9 +1639,9 @@ async def video_upload_page():
                         if (job.status === 'completed') {
                             clearInterval(pollTimer);
                             showProgress(100, id);
-                            showStatus('Обработка завершена успешно!', 'completed');
+                            showStatus('Processing completed successfully!', 'completed');
                             
-                            // Разрешаем загрузку нового файла
+                            // Allow uploading a new file
                             uploadBtn.disabled = false;
                             cancelBtn.disabled = true;
                             document.getElementById('resetBtn').style.display = 'inline-block';
@@ -1655,19 +1655,19 @@ async def video_upload_page():
                                     }
                                 }
                             } catch (e) {
-                                console.error('Ошибка получения результата:', e);
+                                console.error('Error getting result:', e);
                             }
                         } else if (job.status === 'failed') {
                             clearInterval(pollTimer);
-                            showStatus('Ошибка обработки: ' + (job.error_message || 'Неизвестная ошибка'), 'failed');
+                            showStatus('Processing error: ' + (job.error_message || 'Unknown error'), 'failed');
                             
-                            // Разрешаем загрузку нового файла даже при ошибке
+                            // Allow uploading a new file even on error
                             uploadBtn.disabled = false;
                             cancelBtn.disabled = true;
                             document.getElementById('resetBtn').style.display = 'inline-block';
                         }
                     } catch (e) {
-                        console.error('Ошибка запроса статуса job:', e);
+                        console.error('Error requesting job status:', e);
                     }
                 }, 2000);
             }
