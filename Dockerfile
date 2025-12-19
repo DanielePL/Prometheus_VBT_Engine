@@ -20,22 +20,17 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 # ========== System Dependencies ==========
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    # OpenCV dependencies (libGL fix)
-    libgl1 \
-    libgl1-mesa-glx \
+    # OpenCV headless dependencies
     libglib2.0-0 \
     libsm6 \
     libxext6 \
     libxrender1 \
     libgomp1 \
-    libgthread-2.0-0 \
     # Video processing
-    libavcodec-dev \
+    ffmpeg \
+    libavcodec-extra \
     libavformat-dev \
     libswscale-dev \
-    libjpeg-dev \
-    libpng-dev \
-    libtiff-dev \
     # For health checks
     curl \
     && rm -rf /var/lib/apt/lists/* /var/cache/apt/* \
