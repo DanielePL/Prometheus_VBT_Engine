@@ -20,8 +20,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 # ========== System Dependencies ==========
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    # OpenCV dependencies
-    libgl1-mesa-dri \
+    # OpenCV dependencies (libGL fix)
+    libgl1 \
+    libgl1-mesa-glx \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
