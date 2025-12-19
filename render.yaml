@@ -1,0 +1,40 @@
+# Render.com Deployment Configuration for NeiroFitnessApp
+# https://render.com/docs/yaml-spec
+
+services:
+  - type: web
+    name: neirofitness-vbt-backend
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    region: frankfurt  # EU region for lower latency
+    plan: starter      # Minimum 512MB RAM - YOLO needs memory!
+
+    # Health Check Configuration
+    healthCheckPath: /api/health
+
+    # Environment Variables
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: MAX_FILE_SIZE_MB
+        value: "500"
+      - key: MAX_CONCURRENT_JOBS
+        value: "2"  # Reduced for stability on Render
+      - key: OMP_NUM_THREADS
+        value: "1"  # Limit OpenMP threads to prevent memory issues
+      - key: OPENCV_LOG_LEVEL
+        value: "ERROR"
+      - key: PYTHONDONTWRITEBYTECODE
+        value: "1"
+
+    # Auto-deploy on push to main branch
+    autoDeploy: true
+
+    # Build filter - only deploy on changes to these paths
+    buildFilter:
+      paths:
+        - app/**
+        - main.py
+        - requirements.txt
+        - Dockerfile
+        - render.yaml

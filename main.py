@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import Config
 from app.models import JobStatus, UploadSession, StreamSession
 from app.routes_simple import job_router, upload_router, webrtc_router, main_router
+from app.routes_prometheus import prometheus_router
 from app.webrtc_handler import WebRTCHandler
 
 # Настройка логирования
@@ -103,6 +104,7 @@ app.include_router(main_router)
 app.include_router(job_router)
 app.include_router(upload_router)
 app.include_router(webrtc_router)
+app.include_router(prometheus_router)  # Prometheus Android-App kompatible Endpunkte
 
 
 @app.on_event("startup")
@@ -129,6 +131,7 @@ if __name__ == "__main__":
         "main:app",
         host=Config.HOST,
         port=Config.PORT,
-        reload=True,
-        log_level="info"
+        reload=False,  # Disable reload in production
+        log_level="info",
+        timeout_keep_alive=30
     )
